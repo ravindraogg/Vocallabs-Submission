@@ -78,6 +78,7 @@ async function resolveEmails(contacts) {
             },
             data: {
               linkedin_url: contact.linkedinUrl,
+              profile: contact.linkedinUrl,
             },
           }, STAGE);
 

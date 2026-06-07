@@ -21,19 +21,10 @@ const { resolveEmails } = require('./stages/eazyreach');
 const { sendOutreach } = require('./stages/brevo');
 
 /**
- * Display a summary table of contacts and prompt for confirmation
- * @param {Array} contacts - Enriched contacts with emails
- * @param {boolean} isDryRun - Whether SEND_EMAILS is false
- * @returns {boolean} Whether the user confirmed
+ * Display a summary table of contacts
+ * @param {Array} enrichedContacts - Enriched contacts with emails
  */
-function safetyCheckpoint(contacts, isDryRun) {
-  console.log('');
-  logger.divider();
-  console.log(chalk.bold.red('  SAFETY CHECKPOINT — Review Before Sending'));
-  logger.divider();
-  console.log('');
-
-  // Build a summary table
+function displaySummaryTable(enrichedContacts) {
   const table = new Table({
     head: [
       chalk.cyan('#'),
@@ -46,11 +37,27 @@ function safetyCheckpoint(contacts, isDryRun) {
     wordWrap: true,
   });
 
-  contacts.forEach((c, i) => {
+  enrichedContacts.forEach((c, i) => {
     table.push([i + 1, c.fullName, c.title || 'N/A', c.companyName, c.email]);
   });
 
   console.log(table.toString());
+}
+
+/**
+ * Display a summary table of contacts and prompt for confirmation
+ * @param {Array} contacts - Enriched contacts with emails
+ * @param {boolean} isDryRun - Whether SEND_EMAILS is false
+ * @returns {boolean} Whether the user confirmed
+ */
+function safetyCheckpoint(contacts, isDryRun) {
+  console.log('');
+  logger.divider();
+  console.log(chalk.bold.red('  SAFETY CHECKPOINT — Review Before Sending'));
+  logger.divider();
+  console.log('');
+
+  displaySummaryTable(contacts);
   console.log('');
 
   const modeLabel = isDryRun
@@ -103,6 +110,11 @@ async function runPipeline(seedDomain) {
 
   // ── STAGE 3: Eazyreach — Resolve Work Emails ──
   const maxContacts = process.env.MAX_CONTACTS ? parseInt(process.env.MAX_CONTACTS, 10) : 5;
+  
+  if (contacts.length > maxContacts) {
+    logger.warn('PIPELINE', `Queue truncated from ${contacts.length} down to ${maxContacts} contacts to optimize API usage bounds.`);
+  }
+  
   const contactsToResolve = contacts.slice(0, maxContacts);
   const enrichedContacts = await resolveEmails(contactsToResolve);
   if (enrichedContacts.length === 0) {
@@ -122,23 +134,7 @@ async function runPipeline(seedDomain) {
     logger.divider();
     console.log('');
 
-    const table = new Table({
-      head: [
-        chalk.cyan('#'),
-        chalk.cyan('Name'),
-        chalk.cyan('Title'),
-        chalk.cyan('Company'),
-        chalk.cyan('Email'),
-      ],
-      colWidths: [4, 22, 28, 20, 30],
-      wordWrap: true,
-    });
-
-    enrichedContacts.forEach((c, i) => {
-      table.push([i + 1, c.fullName, c.title || 'N/A', c.companyName, c.email]);
-    });
-
-    console.log(table.toString());
+    displaySummaryTable(enrichedContacts);
     console.log('');
     confirmed = true;
   } else {

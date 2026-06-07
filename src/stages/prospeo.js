@@ -96,37 +96,8 @@ async function findDecisionMakers(companies, options = {}) {
 
       logger.success(STAGE, `  Found ${topResults.length} contacts at ${company.name}`);
     } catch (err) {
-      logger.warn(STAGE, `  API failed for ${company.domain} (${err.message}). Generating mock decision-makers for demo...`);
-      
-      const mockContacts = [
-        {
-          personId: `mock-${company.name.toLowerCase().replace(/\s+/g, '')}-1`,
-          firstName: 'Sarah',
-          lastName: 'Connors',
-          fullName: 'Sarah Connors',
-          title: 'VP of Sales',
-          seniority: 'Vice President',
-          linkedinUrl: `https://www.linkedin.com/in/sarah-connors-${company.name.toLowerCase().replace(/\s+/g, '')}`,
-          companyDomain: company.domain,
-          companyName: company.name,
-        },
-        {
-          personId: `mock-${company.name.toLowerCase().replace(/\s+/g, '')}-2`,
-          firstName: 'David',
-          lastName: 'Miller',
-          fullName: 'David Miller',
-          title: 'Founder & CEO',
-          seniority: 'C-Suite',
-          linkedinUrl: `https://www.linkedin.com/in/david-miller-${company.name.toLowerCase().replace(/\s+/g, '')}`,
-          companyDomain: company.domain,
-          companyName: company.name,
-        }
-      ].slice(0, maxPerCompany);
-
-      for (const contact of mockContacts) {
-        allContacts.push(contact);
-      }
-      logger.success(STAGE, `  Generated ${mockContacts.length} mock contacts for ${company.name}`);
+      const apiErrorMsg = err.response?.data?.message || err.response?.statusText || err.message;
+      logger.warn(STAGE, `  API failed for ${company.domain} (${apiErrorMsg}). Skipping...`);
     }
 
     // Small delay between requests to avoid rate limits
