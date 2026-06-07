@@ -44,6 +44,7 @@ node index.js intercom.com
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `SEND_EMAILS` | Yes | `false` = dry run (no credits), `true` = live sends |
+| `AUTO_CONFIRM` | No | `true` = skips the manual "y/n" prompt before sending emails |
 | `OCEAN_API_TOKEN` | Yes | Ocean.io API token |
 | `PROSPEO_API_KEY` | Yes | Prospeo API key (from dashboard) |
 | `EAZYREACH_API_KEY` | No* | Eazyreach API key (falls back to Prospeo if missing) |
