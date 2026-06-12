@@ -32,22 +32,16 @@ export default function DashboardPage() {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [finalTranscripts, interimText]);
 
-  // ── Cleanup on unmount ────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      stopRecording();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── Stop everything ───────────────────────────────────────────
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback((nextStatus: Status = "idle") => {
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
     recorderRef.current = null;
 
     if (socketRef.current) {
+      socketRef.current.onclose = null;
+      socketRef.current.onerror = null;
       socketRef.current.close();
       socketRef.current = null;
     }
@@ -57,9 +51,16 @@ export default function DashboardPage() {
       streamRef.current = null;
     }
 
-    setStatus("idle");
+    setStatus(nextStatus);
     setInterimText("");
   }, []);
+
+  // ── Cleanup on unmount ────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      stopRecording();
+    };
+  }, [stopRecording]);
 
   // ── Start recording ───────────────────────────────────────────
   const startRecording = useCallback(async () => {
@@ -80,12 +81,23 @@ export default function DashboardPage() {
       ws.onopen = () => {
         setStatus("listening");
 
+        // Determine best supported MIME type (for cross-browser compatibility, e.g. Safari)
+        let mimeType = "";
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+          mimeType = "audio/webm";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+          mimeType = "audio/ogg;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          mimeType = "audio/mp4";
+        }
+
         // 3. Start MediaRecorder & stream chunks
-        const recorder = new MediaRecorder(stream, {
-          mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-            ? "audio/webm;codecs=opus"
-            : "audio/webm",
-        });
+        const recorder = new MediaRecorder(
+          stream,
+          mimeType ? { mimeType } : undefined
+        );
         recorderRef.current = recorder;
 
         recorder.ondataavailable = (e) => {
@@ -105,7 +117,7 @@ export default function DashboardPage() {
           if (data.type === "status") return;
           if (data.type === "error") {
             setErrorMsg(data.message);
-            setStatus("error");
+            stopRecording("error");
             return;
           }
 
@@ -126,14 +138,16 @@ export default function DashboardPage() {
 
       ws.onerror = () => {
         setErrorMsg("WebSocket connection failed. Is the backend running?");
-        setStatus("error");
-        stopRecording();
+        stopRecording("error");
       };
 
       ws.onclose = () => {
-        if (status === "listening") {
-          setStatus("idle");
-        }
+        setStatus((prev) => {
+          if (prev === "listening" || prev === "connecting") {
+            return "idle";
+          }
+          return prev;
+        });
       };
     } catch (err: unknown) {
       const msg =
@@ -141,7 +155,7 @@ export default function DashboardPage() {
       setErrorMsg(msg);
       setStatus("error");
     }
-  }, [stopRecording, status]);
+  }, [stopRecording]);
 
   // ── Toggle ────────────────────────────────────────────────────
   const toggleRecording = () => {
